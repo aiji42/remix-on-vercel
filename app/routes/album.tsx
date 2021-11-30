@@ -1,19 +1,15 @@
 import type { MetaFunction, LoaderFunction } from 'remix'
 import { useLoaderData, Link } from 'remix'
-import { db } from '~/utils/db.server'
+import { supabase } from '~/utils/supabase.server'
 
 type IndexData = {
   albums: { id: string; name: string; cover: string }[]
 }
 
-export const loader: LoaderFunction = async ({ request }) => {
-  const albums = await db.album.findMany({
-    select: {
-      id: true,
-      name: true,
-      cover: true
-    }
-  })
+export const loader: LoaderFunction = async () => {
+  const { data: albums } = await supabase()
+    .from('Album')
+    .select('id, name, cover')
 
   return { albums }
 }

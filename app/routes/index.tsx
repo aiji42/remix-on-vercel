@@ -1,6 +1,6 @@
 import type { MetaFunction, LoaderFunction } from 'remix'
 import { useLoaderData, Link } from 'remix'
-import { db } from '~/utils/db.server'
+import { supabase } from '~/utils/supabase.server'
 
 type IndexData = {
   artists: { id: string; name: string; picture: string }[]
@@ -8,34 +8,25 @@ type IndexData = {
   playlists: { id: string; name: string; cover: string }[]
 }
 
-export let loader: LoaderFunction = async ({ request }) => {
+export let loader: LoaderFunction = async () => {
+  const artistPromise = supabase()
+    .from('Artist')
+    .select('id, name, picture')
+    .limit(5)
 
-  const artists = await db.artist.findMany({
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      picture: true
-    }
-  })
+  const albumsPromise = supabase()
+    .from('Album')
+    .select('id, name, cover')
+    .limit(5)
 
-  const albums = await db.album.findMany({
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      cover: true
-    }
-  })
+  const playlistsPromise = supabase()
+    .from('Playlist')
+    .select('id, name, cover')
+    .limit(10)
 
-  const playlists = await db.playlist.findMany({
-    take: 10,
-    select: {
-      id: true,
-      name: true,
-      cover: true
-    }
-  })
+  const { data: artists } = await artistPromise
+  const { data: albums } = await albumsPromise
+  const { data: playlists } = await playlistsPromise
 
   return { artists, albums, playlists }
 }

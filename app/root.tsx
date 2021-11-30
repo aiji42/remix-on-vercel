@@ -13,9 +13,8 @@ import {
   useLocation
 } from 'remix'
 import type { LinksFunction } from 'remix'
-import { db } from '~/utils/db.server'
-import { Playlist } from '@prisma/client'
-import styles from './tailwind.css'
+import styles from '~/tailwind.css'
+import { supabase } from '~/utils/supabase.server'
 
 export let links: LinksFunction = () => {
   return [
@@ -28,16 +27,16 @@ export let links: LinksFunction = () => {
 }
 
 type Data = {
-  user: { name: string; playlists: Playlist[] }
+  user: { name: string; Playlist: { id: string; name: string }[] }
+  isCaching: boolean
 }
 
 export const loader: LoaderFunction = async ({ request }) => {
-  const user = await db.user.findFirst({
-    select: {
-      name: true,
-      playlists: true
-    }
-  })
+  const { data: user, error } = await supabase()
+    .from('User')
+    .select('name, Playlist (id, name)')
+    .limit(1)
+    .single()
 
   if (!user) throw new Response('Bad Request', { status: 401 })
 
@@ -54,29 +53,26 @@ export default function App() {
   )
 }
 
-function Document({
-  children,
-  title
-}: {
+function Document({ children, title }: {
   children: React.ReactNode
   title?: string
 }) {
   return (
     <html lang="en">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        {title ? <title>{title}</title> : null}
-        <Meta />
-        <Links />
-      </head>
-      <body>
-        {children}
-        <RouteChangeAnnouncement />
-        <ScrollRestoration />
-        <Scripts />
-        {process.env.NODE_ENV === 'development' && <LiveReload />}
-      </body>
+    <head>
+      <meta charSet="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      {title ? <title>{title}</title> : null}
+      <Meta />
+      <Links />
+    </head>
+    <body>
+    {children}
+    <RouteChangeAnnouncement />
+    <ScrollRestoration />
+    <Scripts />
+    {process.env.NODE_ENV === 'development' && <LiveReload />}
+    </body>
     </html>
   )
 }
@@ -105,6 +101,9 @@ function Layout({ children }: React.PropsWithChildren<{}>) {
 export function CatchBoundary() {
   let caught = useCatch()
 
+  console.error(caught.status)
+  console.error(caught.data)
+
   let message
   switch (caught.status) {
     case 401:
@@ -127,31 +126,29 @@ export function CatchBoundary() {
 
   return (
     <Document title={`${caught.status} ${caught.statusText}`}>
-      <Layout>
-        <h1>
-          {caught.status}: {caught.statusText}
-        </h1>
-        {message}
-      </Layout>
+      <h1>
+        {caught.status}: {caught.statusText}
+      </h1>
+      {message}
     </Document>
   )
 }
 
 export function ErrorBoundary({ error }: { error: Error }) {
-  console.error(error)
+  console.error(error.stack)
+  console.error(error.message)
+  console.error(error.name)
   return (
     <Document title="Error!">
-      <Layout>
-        <div>
-          <h1>There was an error</h1>
-          <p>{error.message}</p>
-          <hr />
-          <p>
-            Hey, developer, you should replace this with what you want your
-            users to see.
-          </p>
-        </div>
-      </Layout>
+      <div>
+        <h1>There was an error</h1>
+        <p>{error.message}</p>
+        <hr />
+        <p>
+          Hey, developer, you should replace this with what you want your users
+          to see.
+        </p>
+      </div>
     </Document>
   )
 }
@@ -295,7 +292,7 @@ const SideBar: VFC = () => {
           Playlists
         </h3>
         <ul className="leading-extra-loose mb-6">
-          {user.playlists.map(({ id, name }) => (
+          {user.Playlist.map(({ id, name }) => (
             <li className="truncate" key={id}>
               <Link to={`/playlist/${id}`} className="hover:text-white">
                 {name}
